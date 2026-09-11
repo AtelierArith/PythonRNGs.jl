@@ -109,6 +109,11 @@ Notes:
 - `NumPyRandom` throws `NotSupportedError` for integer ranges whose
   element type NumPy has no dtype for (`Int128`, `UInt128`, `BigInt`);
   `PythonRandom` supports those.
+- Multidimensional arrays are filled in column-major (Fortran) order:
+  - `rand(rng::NumPyRandom, dims...)` equals
+    `default_rng(seed).random(prod(dims)).reshape(dims, order="F")`.
+  - `rand(rng::PythonRandom, dims...)` equals
+    `numpy.array([random.Random(seed).random() for _ in range(prod(dims))]).reshape(dims, order="F")`.
 - Only uniform distributions are provided. Distributions such as `Normal` or
   `Exponential` are intentionally out of scope; draw a uniform value and
   transform it yourself if needed.

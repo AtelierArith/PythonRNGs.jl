@@ -168,6 +168,34 @@ using PythonCall
         @test_throws NotSupportedError rand(NumPyRandom(1), UInt128(1):UInt128(6))
     end
 
+    @testset "multidimensional arrays ($seed)" for seed in (0, 2024)
+        # PythonRandom: wrap the flat list in a NumPy array and reshape it in
+        # Fortran order (NumPy has no generator for the stdlib `random`).
+        rng = PythonRandom(seed)
+        x = rand(rng, 2, 3)
+        ref = pyimport("random").Random(seed)
+        flat = [pyconvert(Float64, ref.random()) for _ = 1:6]
+        @test vec(x) == flat
+        mF = pyimport("numpy").reshape(pyimport("numpy").array(flat), (2, 3), order = "F")
+        @test x == [pyconvert(Float64, mF[i, k]) for i = 0:1, k = 0:2]
+
+        # NumPyRandom: Julia fills column-major, i.e. NumPy's Fortran order.
+        rng = NumPyRandom(seed)
+        y = rand(rng, 2, 3)
+        ref = pyimport("numpy").random.default_rng(seed)
+        mF = pyimport("numpy").reshape(ref.random(6), (2, 3), order = "F")
+        @test y == [pyconvert(Float64, mF[i, k]) for i = 0:1, k = 0:2]
+
+        for r in (PythonRandom(seed), NumPyRandom(seed))
+            x = rand(r, 2, 3)
+            @test x isa Matrix{Float64}
+            @test size(x) == (2, 3)
+            @test size(rand(r, Float32, 2, 3)) == (2, 3)
+            @test size(rand(r, 1:6, 2, 3)) == (2, 3)
+            @test size(rand(r, 'a':'z', 2, 3)) == (2, 3)
+        end
+    end
+
     @testset "copy / deepcopy are independent" for rng in
                                                    (PythonRandom(11), NumPyRandom(11))
         c = copy(rng)
