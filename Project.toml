@@ -1,0 +1,16 @@
+name = "PythonRNGs"
+uuid = "2ab52f32-f18f-4b77-bafc-f169e377582d"
+version = "0.1.0"
+authors = ["Satoshi Terasaki <terasakisatoshi.math@gmail.com>"]
+
+[deps]
+PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[compat]
+PythonCall = "0.9"
+Random = "1"
+julia = "1.10"
+
+[workspace]
+projects = ["test"]
