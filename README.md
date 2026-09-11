@@ -161,4 +161,4 @@ The test suite verifies, for all backends, that floats, integers, ranges
 the corresponding Python calls draw-for-draw, that unsupported ranges raise
 `NotSupportedError`, and that scalar types, reseeding, copying, and
 independence behave as expected. NumPy is provided to the test environment
-through CondaPkg (`test/CondaPkg.toml`).
+through CondaPkg (`CondaPkg.toml` at the repository root).
