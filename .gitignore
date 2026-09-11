@@ -1,4 +1,5 @@
 .CondaPkg/
+.codegraph/
 Manifest.toml
 *.jl.cov
 *.jl.*.cov
