@@ -6,6 +6,11 @@ The same three examples written twice:
 - [`main.jl`](main.jl) uses `PythonRNGs`, and produces **exactly the same
   numbers** by driving the same Python generators.
 
+These examples are not about speed: `PythonRNGs` calls into Python, so it is
+slower than a native Julia RNG. They show how to **validate a Julia port of
+Python code** by checking that the translated routine matches the original
+Python implementation value-for-value.
+
 | Example | Python (`main.py`) | Julia (`main.jl`) | Seed |
 | --- | --- | --- | --- |
 | `example1` | `random.seed` + `random.random()` | `PythonRandom` | 1234 |

@@ -106,7 +106,8 @@ end
 function _pynumpy()
     try
         return pyimport("numpy")
-    catch
+    catch e
+        e isa PythonCall.PyException || rethrow()
         throw(
             ArgumentError(
                 "NumPy-backed generators require NumPy in the Python environment used " *

@@ -1,7 +1,7 @@
 [project]
 name = "examples"
 version = "0.1.0"
-description = "Add your description here"
+description = "Examples comparing Python and Julia random draws with PythonRNGs.jl"
 readme = "README.md"
 authors = [
     { name = "Satoshi Terasaki", email = "terasakisatoshi.math@gmail.com" }
@@ -10,10 +10,3 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.3",
 ]
-
-[project.scripts]
-examples = "examples:main"
-
-[build-system]
-requires = ["uv_build>=0.12.7,<0.13.0"]
-build-backend = "uv_build"

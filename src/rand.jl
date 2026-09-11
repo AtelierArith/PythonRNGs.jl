@@ -20,10 +20,10 @@ Random.rng_native_52(::AbstractPythonRNG) = UInt64
 
 # Native uniform integers.
 #
-# Python's `random.Random` exposes `getrandbits(k)`, while NumPy's `Generator`
-# exposes `integers` (bounded) and `BitGenerator.random_raw` (full 64 bits).
-# Delegating to these keeps `rand(rng, T)` equal to the corresponding Python
-# draw for the same seed.
+# Python's `random.Random` exposes `getrandbits(k)`; NumPy's `Generator`
+# exposes `integers` (bounded) and `BitGenerator.random_raw` (full 64 bits);
+# the legacy `RandomState` exposes `randint` (bounded). Delegating to these
+# keeps `rand(rng, T)` equal to the corresponding Python draw for the same seed.
 
 _rand_uint(rng::PythonRandom, ::Type{UInt8}) = pyconvert(UInt8, rng.pyobj.getrandbits(8))
 _rand_uint(rng::PythonRandom, ::Type{UInt16}) = pyconvert(UInt16, rng.pyobj.getrandbits(16))
@@ -108,7 +108,8 @@ Random.rand(rng::AbstractPythonRNG, ::Random.SamplerType{Bool}) = _rand_bool(rng
 #
 #   PythonRandom -> `random.Random.randint(a, b)` for `a:b`, and `randrange`
 #                   for step ranges
-#   NumPyRandomDefaultRNG  -> `Generator.integers(a, b, endpoint = true, dtype = ...)`
+#   NumPyRandomDefaultRNG -> `Generator.integers(a, b, endpoint = true, dtype = ...)`
+#   NumPyRandomState      -> `RandomState.randint(a, b + 1, dtype = ...)`
 #
 # Ranges with no NumPy equivalent throw a `NotSupportedError`.
 

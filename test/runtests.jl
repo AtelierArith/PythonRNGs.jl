@@ -54,12 +54,25 @@ using PythonCall
         rf = pyimport("numpy").random.RandomState(seed)
         @test [rand(r, 1:6) for _ = 1:5] == [pyconvert(Int, rf.randint(1, 7)) for _ = 1:5]
 
+        # Full `UInt64` uses a Python big-int bound.
+        r = NumPyRandomState(seed)
+        rf = pyimport("numpy").random.RandomState(seed)
+        @test [rand(r, UInt64) for _ = 1:5] == [pyconvert(UInt64, rf.randint(0, big(2)^64, dtype = "uint64")) for _ = 1:5]
+
+        # Step ranges via `choice`.
+        r = NumPyRandomState(seed)
+        rf = pyimport("numpy").random.RandomState(seed)
+        @test [rand(r, 1:2:9) for _ = 1:5] == [pyconvert(Int, rf.choice(collect(1:2:9))) for _ = 1:5]
+
         @test_throws NotSupportedError rand(NumPyRandomState(1), Int128(1):Int128(6))
         @test_throws NotSupportedError rand(NumPyRandomState(1), big(1):big(6))
     end
 
-    @testset "seed! reproduces the stream" for rng in
-                                               (PythonRandom(42), NumPyRandomDefaultRNG(42))
+    @testset "seed! reproduces the stream" for rng in (
+        PythonRandom(42),
+        NumPyRandomDefaultRNG(42),
+        NumPyRandomState(42),
+    )
         a = rand(rng, 10)
         Random.seed!(rng, 42)
         @test rand(rng, 10) == a
@@ -73,7 +86,11 @@ using PythonCall
         @test rand(rng) isa Float64
     end
 
-    @testset "uniform scalar types" for rng in (PythonRandom(7), NumPyRandomDefaultRNG(7))
+    @testset "uniform scalar types" for rng in (
+        PythonRandom(7),
+        NumPyRandomDefaultRNG(7),
+        NumPyRandomState(7),
+    )
         for T in (Float64, Float32, Float16)
             x = rand(rng, T)
             @test x isa T
@@ -85,7 +102,11 @@ using PythonCall
         end
     end
 
-    @testset "ranges and arrays" for rng in (PythonRandom(99), NumPyRandomDefaultRNG(99))
+    @testset "ranges and arrays" for rng in (
+        PythonRandom(99),
+        NumPyRandomDefaultRNG(99),
+        NumPyRandomState(99),
+    )
         @test rand(rng, 1:6) in 1:6
         v = rand(rng, 1:6, 100)
         @test length(v) == 100
@@ -100,10 +121,13 @@ using PythonCall
         @test rand(PythonRandom(1), 5) != rand(PythonRandom(2), 5)
         @test rand(NumPyRandomDefaultRNG(5), 5) == rand(NumPyRandomDefaultRNG(5), 5)
         @test rand(NumPyRandomDefaultRNG(1), 5) != rand(NumPyRandomDefaultRNG(2), 5)
+        @test rand(NumPyRandomState(5), 5) == rand(NumPyRandomState(5), 5)
+        @test rand(NumPyRandomState(1), 5) != rand(NumPyRandomState(2), 5)
     end
     @testset "integer draws are reproducible" for rng in (
         PythonRandom(3),
         NumPyRandomDefaultRNG(3),
+        NumPyRandomState(3),
     )
         a = [rand(rng, UInt64) for _ = 1:10]
         Random.seed!(rng, 3)
@@ -152,6 +176,10 @@ using PythonCall
         rng = NumPyRandomDefaultRNG(seed)
         ref = pyimport("numpy").random.default_rng(seed)
         @test [rand(rng, Float32) for _ = 1:5] == [pyconvert(Float32, ref.random(dtype = "float32")) for _ = 1:5]
+
+        rng = NumPyRandomState(seed)
+        ref = pyimport("numpy").random.RandomState(seed)
+        @test rand(rng, 6) == [pyconvert(Float64, x) for x in ref.random_sample(6).tolist()]
     end
 
     @testset "integer ranges match Python ($seed)" for seed in (0, 2024)
@@ -189,8 +217,20 @@ using PythonCall
             _ = 1:6
         ]
 
+        rng = NumPyRandomState(seed)
+        ref = pyimport("numpy").random.RandomState(seed)
+        @test [rand(rng, 'a':'z') for _ = 1:6] == [
+            pyconvert(String, ref.choice(collect("abcdefghijklmnopqrstuvwxyz")))[1] for
+            _ = 1:6
+        ]
+
         rng = PythonRandom(seed)
         ref = pyimport("random").Random(seed)
+        r = 1.0:0.5:2.0
+        @test [rand(rng, r) for _ = 1:6] == [pyconvert(Float64, ref.choice(collect(r))) for _ = 1:6]
+
+        rng = NumPyRandomState(seed)
+        ref = pyimport("numpy").random.RandomState(seed)
         r = 1.0:0.5:2.0
         @test [rand(rng, r) for _ = 1:6] == [pyconvert(Float64, ref.choice(collect(r))) for _ = 1:6]
     end
@@ -221,7 +261,14 @@ using PythonCall
         mF = pyimport("numpy").reshape(ref.random(6), (2, 3), order = "F")
         @test y == [pyconvert(Float64, mF[i, k]) for i = 0:1, k = 0:2]
 
-        for r in (PythonRandom(seed), NumPyRandomDefaultRNG(seed))
+        # NumPyRandomState: same Fortran-order layout.
+        rng = NumPyRandomState(seed)
+        z = rand(rng, 2, 3)
+        ref = pyimport("numpy").random.RandomState(seed)
+        mF = pyimport("numpy").reshape(ref.random_sample(6), (2, 3), order = "F")
+        @test z == [pyconvert(Float64, mF[i, k]) for i = 0:1, k = 0:2]
+
+        for r in (PythonRandom(seed), NumPyRandomDefaultRNG(seed), NumPyRandomState(seed))
             x = rand(r, 2, 3)
             @test x isa Matrix{Float64}
             @test size(x) == (2, 3)
@@ -234,6 +281,7 @@ using PythonCall
     @testset "copy / deepcopy are independent" for rng in (
         PythonRandom(11),
         NumPyRandomDefaultRNG(11),
+        NumPyRandomState(11),
     )
         c = copy(rng)
         @test rand(rng, 5) == rand(c, 5)
