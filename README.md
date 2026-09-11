@@ -162,3 +162,7 @@ the corresponding Python calls draw-for-draw, that unsupported ranges raise
 `NotSupportedError`, and that scalar types, reseeding, copying, and
 independence behave as expected. NumPy is provided to the test environment
 through CondaPkg (`CondaPkg.toml` at the repository root).
+
+## Development
+
+This package was developed with the assistance of DeepSeek v4.1 Flash.
