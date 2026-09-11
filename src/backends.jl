@@ -7,15 +7,17 @@ Python object through [PythonCall.jl](https://github.com/JuliaPy/PythonCall.jl).
 Concrete subtypes:
 
 - [`PythonRandom`](@ref): backed by Python's standard `random.Random`.
-- [`NumPyRandom`](@ref): backed by `numpy.random.default_rng`.
+- [`NumPyRandomDefaultRNG`](@ref): backed by `numpy.random.default_rng`.
+- [`NumPyRandomState`](@ref): backed by the legacy `numpy.random.RandomState`.
 """
 abstract type AbstractPythonRNG <: Random.AbstractRNG end
 
 """
     NotSupportedError(msg)
 
-Thrown by [`PythonRandom`](@ref) or [`NumPyRandom`](@ref) when a requested draw
-has no equivalent in the wrapped Python backend.
+Thrown by [`PythonRandom`](@ref), [`NumPyRandomDefaultRNG`](@ref), or
+[`NumPyRandomState`](@ref) when a requested draw has no equivalent in the
+wrapped Python backend.
 """
 struct NotSupportedError <: Exception
     msg::String
@@ -23,7 +25,7 @@ end
 
 Base.showerror(io::IO, e::NotSupportedError) = print(io, "Not supported: ", e.msg)
 
-# Both concrete types expose the same fields so that the generic `rand` methods
+# All concrete types expose the same fields so that the generic `rand` methods
 # and `Random.seed!` can be written against `AbstractPythonRNG`:
 #
 #   pyobj   : the underlying Python RNG object
@@ -35,11 +37,20 @@ mutable struct PythonRandom <: AbstractPythonRNG
     factory::Py
 end
 
-mutable struct NumPyRandom <: AbstractPythonRNG
+mutable struct NumPyRandomDefaultRNG <: AbstractPythonRNG
     pyobj::Py
     random::Py
     factory::Py
 end
+
+mutable struct NumPyRandomState <: AbstractPythonRNG
+    pyobj::Py
+    random::Py
+    factory::Py
+end
+
+# Backwards-compatible alias; prefer `NumPyRandomDefaultRNG`.
+const NumPyRandom = NumPyRandomDefaultRNG
 
 """
     PythonRandom([seed])
@@ -58,7 +69,7 @@ function PythonRandom(seed::Union{Integer,Nothing} = nothing)
 end
 
 """
-    NumPyRandom([seed])
+    NumPyRandomDefaultRNG([seed])
 
 Create an `AbstractRNG` that draws uniform random numbers from NumPy's
 [`numpy.random.default_rng`](https://numpy.org/doc/stable/reference/random/generator.html).
@@ -67,11 +78,29 @@ Create an `AbstractRNG` that draws uniform random numbers from NumPy's
 would return on the same draw. When `seed` is omitted the generator is seeded
 from the operating system entropy.
 """
-function NumPyRandom(seed::Union{Integer,Nothing} = nothing)
+function NumPyRandomDefaultRNG(seed::Union{Integer,Nothing} = nothing)
     np = _pynumpy()
     factory = np.random.default_rng
     pyobj = seed === nothing ? factory() : factory(seed)
-    return NumPyRandom(pyobj, pyobj.random, factory)
+    return NumPyRandomDefaultRNG(pyobj, pyobj.random, factory)
+end
+
+"""
+    NumPyRandomState([seed])
+
+Create an `AbstractRNG` that draws uniform random numbers from NumPy's legacy
+[`numpy.random.RandomState`](https://numpy.org/doc/stable/reference/random/legacy.html),
+i.e. the generator behind `np.random.seed(...)` and `np.random.random(...)`.
+
+`rand(rng, Float64)` returns exactly the value that
+`RandomState(seed).random_sample()` would return on the same draw. When `seed`
+is omitted the generator is seeded from the operating system entropy.
+"""
+function NumPyRandomState(seed::Union{Integer,Nothing} = nothing)
+    np = _pynumpy()
+    factory = np.random.RandomState
+    pyobj = seed === nothing ? factory() : factory(seed)
+    return NumPyRandomState(pyobj, pyobj.random, factory)
 end
 
 function _pynumpy()
@@ -80,8 +109,8 @@ function _pynumpy()
     catch
         throw(
             ArgumentError(
-                "NumPyRandom requires NumPy in the Python environment used by " *
-                "PythonCall. Install it, for example, with " *
+                "NumPy-backed generators require NumPy in the Python environment used " *
+                "by PythonCall. Install it, for example, with " *
                 "`using CondaPkg; CondaPkg.add(\"numpy\")` before loading PythonRNGs.",
             ),
         )
