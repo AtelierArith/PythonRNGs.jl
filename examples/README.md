@@ -101,17 +101,12 @@ with `main.py` regardless of which NumPy API is being used.
 using PythonRNGs
 using Random: Random
 
-example1(rng::Random.AbstractRNG) = 2rand(rng) + 1
-example2(rng::Random.AbstractRNG) = 2rand(rng) + 1
+example1(seed) = 2rand(PythonRandom(seed)) + 1
+example2(seed) = 2rand(NumPyRandomState(seed)) + 1
 example3(rng::Random.AbstractRNG) = 2rand(rng) + 1
 
-rng = PythonRandom()
-Random.seed!(rng, 1234)
-@show example1(rng)
-
-rng = NumPyRandomState()
-Random.seed!(rng, 999)
-@show example2(rng)
+@show example1(1234)
+@show example2(999)
 
 rng = NumPyRandomDefaultRNG(42)
 @show example3(rng)
@@ -123,20 +118,20 @@ rng = NumPyRandomDefaultRNG(42)
 import random
 import numpy as np
 
-def example1():
+def example1(seed):
+    random.seed(seed)
     return 2 * random.random() + 1
 
-def example2():
+def example2(seed):
+    np.random.seed(seed)
     return 2 * np.random.random() + 1
 
 def example3(rng):
     return 2 * rng.random() + 1
 
 def main():
-    random.seed(1234)
-    print(f"{example1()=}")
-    np.random.seed(999)
-    print(f"{example2()=}")
+    print(f"{example1(1234)=}")
+    print(f"{example2(999)=}")
     rng = np.random.default_rng(42)
     print(f"{example3(rng)=}")
 
