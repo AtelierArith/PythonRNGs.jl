@@ -14,7 +14,7 @@ Python implementation value-for-value.
 | Example | Python (`main.py`) | Julia (`main.jl`) | Seed |
 | --- | --- | --- | --- |
 | `example1` | `random.seed` + `random.random()` | `PythonRandom` | 1234 |
-| `example2` | `np.random.seed` + `np.random.random()` (legacy) | `NumPyRandomState` | 999 |
+| `example2` | `np.random.seed` + `np.random.random()` (legacy) | `NumPyRandom` | 999 |
 | `example3` | `np.random.default_rng` | `NumPyRandomDefaultRNG` | 42 |
 
 ## Expected output
@@ -87,7 +87,7 @@ so their numbers differ even for the same seed:
 | Backend | Python API | Underlying generator |
 | --- | --- | --- |
 | `PythonRandom` | `random.Random` | CPython Mersenne Twister |
-| `NumPyRandomState` | `numpy.random.RandomState` | MT19937 (`np.random.seed`) |
+| `NumPyRandom` | `numpy.random.RandomState` | MT19937 (`np.random.seed`) |
 | `NumPyRandomDefaultRNG` | `numpy.random.default_rng` | PCG64 (`Generator`) |
 
 `PythonRNGs` mirrors each one draw-for-draw, which is why `main.jl` can line up
@@ -102,7 +102,7 @@ using PythonRNGs
 using Random: Random
 
 example1(seed) = 2rand(PythonRandom(seed)) + 1
-example2(seed) = 2rand(NumPyRandomState(seed)) + 1
+example2(seed) = 2rand(NumPyRandom(seed)) + 1
 example3(rng::Random.AbstractRNG) = 2rand(rng) + 1
 
 @show example1(1234)

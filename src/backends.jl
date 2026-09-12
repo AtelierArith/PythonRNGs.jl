@@ -8,7 +8,7 @@ Concrete subtypes:
 
 - [`PythonRandom`](@ref): backed by Python's standard `random.Random`.
 - [`NumPyRandomDefaultRNG`](@ref): backed by `numpy.random.default_rng`.
-- [`NumPyRandomState`](@ref): backed by the legacy `numpy.random.RandomState`.
+- [`NumPyRandom`](@ref): backed by the legacy `numpy.random.RandomState`.
 """
 abstract type AbstractPythonRNG <: Random.AbstractRNG end
 
@@ -16,7 +16,7 @@ abstract type AbstractPythonRNG <: Random.AbstractRNG end
     NotSupportedError(msg)
 
 Thrown by [`PythonRandom`](@ref), [`NumPyRandomDefaultRNG`](@ref), or
-[`NumPyRandomState`](@ref) when a requested draw has no equivalent in the
+[`NumPyRandom`](@ref) when a requested draw has no equivalent in the
 wrapped Python backend.
 """
 struct NotSupportedError <: Exception
@@ -43,14 +43,11 @@ mutable struct NumPyRandomDefaultRNG <: AbstractPythonRNG
     factory::Py
 end
 
-mutable struct NumPyRandomState <: AbstractPythonRNG
+mutable struct NumPyRandom <: AbstractPythonRNG
     pyobj::Py
     random::Py
     factory::Py
 end
-
-# Backwards-compatible alias; prefer `NumPyRandomDefaultRNG`.
-const NumPyRandom = NumPyRandomDefaultRNG
 
 """
     PythonRandom([seed])
@@ -86,7 +83,7 @@ function NumPyRandomDefaultRNG(seed::Union{Integer,Nothing} = nothing)
 end
 
 """
-    NumPyRandomState([seed])
+    NumPyRandom([seed])
 
 Create an `AbstractRNG` that draws uniform random numbers from NumPy's legacy
 [`numpy.random.RandomState`](https://numpy.org/doc/stable/reference/random/legacy.html),
@@ -96,11 +93,11 @@ i.e. the generator behind `np.random.seed(...)` and `np.random.random(...)`.
 `RandomState(seed).random_sample()` would return on the same draw. When `seed`
 is omitted the generator is seeded from the operating system entropy.
 """
-function NumPyRandomState(seed::Union{Integer,Nothing} = nothing)
+function NumPyRandom(seed::Union{Integer,Nothing} = nothing)
     np = _pynumpy()
     factory = np.random.RandomState
     pyobj = seed === nothing ? factory() : factory(seed)
-    return NumPyRandomState(pyobj, pyobj.random, factory)
+    return NumPyRandom(pyobj, pyobj.random, factory)
 end
 
 function _pynumpy()

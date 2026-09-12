@@ -4,7 +4,7 @@ using Random
 using PythonCall
 
 export AbstractPythonRNG,
-    PythonRandom, NumPyRandom, NumPyRandomDefaultRNG, NumPyRandomState, NotSupportedError
+    PythonRandom, NumPyRandom, NumPyRandomDefaultRNG, NotSupportedError
 
 include("backends.jl")
 include("rand.jl")

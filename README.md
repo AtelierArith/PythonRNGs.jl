@@ -23,9 +23,7 @@ Three backends are provided:
 | --- | --- |
 | `PythonRandom` | `random.Random` |
 | `NumPyRandomDefaultRNG` | `numpy.random.default_rng` (`Generator`) |
-| `NumPyRandomState` | legacy `numpy.random.RandomState` (`np.random.seed` / `np.random.random`) |
-
-`NumPyRandom` is a backwards-compatible alias for `NumPyRandomDefaultRNG`.
+| `NumPyRandom` | legacy `numpy.random.RandomState` (`np.random.seed` / `np.random.random`) |
 
 ## Installation
 
@@ -40,7 +38,7 @@ Requirements:
 
 - Julia 1.10 or newer.
 - A Python interpreter with NumPy, for the `NumPyRandomDefaultRNG` and
-  `NumPyRandomState` backends.
+  `NumPyRandom` backends.
   [PythonCall.jl](https://github.com/JuliaPy/PythonCall.jl) manages one with
   [CondaPkg.jl](https://github.com/JuliaPy/CondaPkg.jl); install NumPy with:
 
@@ -62,7 +60,7 @@ rand(rng)                             # 0.9664535356921388
 default = NumPyRandomDefaultRNG(1234) # wraps numpy.random.default_rng(1234)
 rand(default)                         # 0.9766997666981422
 
-legacy = NumPyRandomState(999)        # wraps numpy.random.RandomState(999)
+legacy = NumPyRandom(999)             # wraps numpy.random.RandomState(999)
 rand(legacy)                          # 0.8034280400796879
 ```
 
@@ -98,8 +96,7 @@ Random.seed!(rng)                  # reseed from OS entropy
 | `AbstractPythonRNG <: Random.AbstractRNG` | Supertype of the generators. |
 | `PythonRandom([seed])` | Uniform draws from Python's `random.Random`. |
 | `NumPyRandomDefaultRNG([seed])` | Uniform draws from `numpy.random.default_rng`. |
-| `NumPyRandomState([seed])` | Uniform draws from the legacy `numpy.random.RandomState`. |
-| `NumPyRandom` | Alias for `NumPyRandomDefaultRNG`. |
+| `NumPyRandom([seed])` | Uniform draws from the legacy `numpy.random.RandomState`. |
 | `Random.seed!(rng[, seed])` | Reseed `rng`, optionally with an integer seed. |
 | `NotSupportedError` | Raised when a draw has no equivalent in the wrapped Python backend. |
 
@@ -109,7 +106,7 @@ When `seed` is omitted, the generator is seeded from operating system entropy.
 
 For the same seed, each draw equals the corresponding Python call:
 
-| Draw | `PythonRandom` | `NumPyRandomDefaultRNG` | `NumPyRandomState` |
+| Draw | `PythonRandom` | `NumPyRandomDefaultRNG` | `NumPyRandom` |
 | --- | --- | --- | --- |
 | `rand(rng, Float64)` | `random.Random(seed).random()` | `default_rng(seed).random()` | `RandomState(seed).random_sample()` |
 | `rand(rng, n)` (array) | `[random.Random(seed).random() for _ in range(n)]` | `default_rng(seed).random(n)` | `RandomState(seed).random_sample(n)` |
@@ -122,8 +119,8 @@ For the same seed, each draw equals the corresponding Python call:
 
 Notes:
 
-- `NumPyRandomState` corresponds to the global legacy API, so
-  `rand(rng::NumPyRandomState, Float64)` equals
+- `NumPyRandom` corresponds to the global legacy API, so
+  `rand(rng::NumPyRandom, Float64)` equals
   `np.random.seed(seed); np.random.random()`.
 - Signed integers reinterpret the native unsigned draw, e.g.
   `rand(rng, Int64) == reinterpret(Int64, rand(rng, UInt64))`.
@@ -131,17 +128,17 @@ Notes:
   `random.choice([a, ..., b])` for `PythonRandom` (because `randint` and
   `choice` both use `_randbelow`), and `Generator.choice` / `RandomState.choice`
   for the NumPy backends.
-- `Float16`, `PythonRandom`'s `Float32`, and `NumPyRandomState`'s `Float32` are
+- `Float16`, `PythonRandom`'s `Float32`, and `NumPyRandom`'s `Float32` are
   derived from a native 32-bit integer draw: Python's standard library has no
   native `Float32`, NumPy's `random` has no `Float16`, and `RandomState` has no
   `Float32`/`Float16`.
-- `NumPyRandomDefaultRNG` and `NumPyRandomState` throw `NotSupportedError` for
+- `NumPyRandomDefaultRNG` and `NumPyRandom` throw `NotSupportedError` for
   integer ranges whose element type NumPy has no dtype for (`Int128`, `UInt128`,
   `BigInt`); `PythonRandom` supports those.
 - Multidimensional arrays are filled in column-major (Fortran) order:
   - `rand(rng::NumPyRandomDefaultRNG, dims...)` equals
     `default_rng(seed).random(prod(dims)).reshape(dims, order="F")`.
-  - `rand(rng::NumPyRandomState, dims...)` equals
+  - `rand(rng::NumPyRandom, dims...)` equals
     `RandomState(seed).random_sample(prod(dims)).reshape(dims, order="F")`.
   - `rand(rng::PythonRandom, dims...)` equals
     `numpy.array([random.Random(seed).random() for _ in range(prod(dims))]).reshape(dims, order="F")`.

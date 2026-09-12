@@ -49,17 +49,17 @@ _rand_bool(rng::NumPyRandomDefaultRNG) =
 # The legacy `RandomState` exposes `randint` (high exclusive) instead of
 # `integers`; `high = 2^N` is passed as a Python arbitrary-precision int so that
 # the full `UInt64` range works.
-_rand_uint(rng::NumPyRandomState, ::Type{UInt8}) =
+_rand_uint(rng::NumPyRandom, ::Type{UInt8}) =
     pyconvert(UInt8, rng.pyobj.randint(0, 0x0100, dtype = "uint8"))
-_rand_uint(rng::NumPyRandomState, ::Type{UInt16}) =
+_rand_uint(rng::NumPyRandom, ::Type{UInt16}) =
     pyconvert(UInt16, rng.pyobj.randint(0, 0x10000, dtype = "uint16"))
-_rand_uint(rng::NumPyRandomState, ::Type{UInt32}) =
+_rand_uint(rng::NumPyRandom, ::Type{UInt32}) =
     pyconvert(UInt32, rng.pyobj.randint(0, 0x100000000, dtype = "uint32"))
-_rand_uint(rng::NumPyRandomState, ::Type{UInt64}) =
+_rand_uint(rng::NumPyRandom, ::Type{UInt64}) =
     pyconvert(UInt64, rng.pyobj.randint(0, big(2)^64, dtype = "uint64"))
-_rand_uint(rng::NumPyRandomState, ::Type{UInt128}) =
+_rand_uint(rng::NumPyRandom, ::Type{UInt128}) =
     (UInt128(_rand_uint(rng, UInt64)) << 64) | UInt128(_rand_uint(rng, UInt64))
-_rand_bool(rng::NumPyRandomState) =
+_rand_bool(rng::NumPyRandom) =
     pyconvert(UInt8, rng.pyobj.randint(0, 0x02, dtype = "uint8")) == 0x01
 
 # NumPy's `Generator.random` has a native `Float32`, so match it exactly.
@@ -109,7 +109,7 @@ Random.rand(rng::AbstractPythonRNG, ::Random.SamplerType{Bool}) = _rand_bool(rng
 #   PythonRandom -> `random.Random.randint(a, b)` for `a:b`, and `randrange`
 #                   for step ranges
 #   NumPyRandomDefaultRNG -> `Generator.integers(a, b, endpoint = true, dtype = ...)`
-#   NumPyRandomState      -> `RandomState.randint(a, b + 1, dtype = ...)`
+#   NumPyRandom      -> `RandomState.randint(a, b + 1, dtype = ...)`
 #
 # Ranges with no NumPy equivalent throw a `NotSupportedError`.
 
@@ -152,7 +152,7 @@ Random.Sampler(rng::PythonRandom, r::AbstractRange, ::Random.Repetition) =
 Random.Sampler(rng::NumPyRandomDefaultRNG, r::AbstractRange, ::Random.Repetition) =
     NumPyRangeSampler{eltype(r),typeof(r)}(r)
 
-Random.Sampler(rng::NumPyRandomState, r::AbstractRange, ::Random.Repetition) =
+Random.Sampler(rng::NumPyRandom, r::AbstractRange, ::Random.Repetition) =
     NumPyRangeSampler{eltype(r),typeof(r)}(r)
 
 function Random.rand(rng::PythonRandom, sp::PythonRangeSampler)
@@ -183,12 +183,12 @@ function Random.rand(rng::NumPyRandomDefaultRNG, sp::NumPyRangeSampler{T}) where
     end
 end
 
-function Random.rand(rng::NumPyRandomState, sp::NumPyRangeSampler{T}) where {T}
+function Random.rand(rng::NumPyRandom, sp::NumPyRangeSampler{T}) where {T}
     r = sp.r
     if T <: NumPyUnsupportedInt
         throw(
             NotSupportedError(
-                "NumPyRandomState does not support ranges of eltype $T; supported integer " *
+                "NumPyRandom does not support ranges of eltype $T; supported integer " *
                 "types are Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64",
             ),
         )
