@@ -115,6 +115,14 @@ function _pynumpy()
     end
 end
 
+"""
+    Random.seed!(rng::AbstractPythonRNG, [seed])
+
+Reseed `rng`. With an integer `seed`, the wrapped Python generator is replaced
+by a fresh one created from `seed`, so the stream restarts exactly as it would
+from a newly constructed generator. When `seed` is omitted (or `nothing`), the
+generator is seeded from operating system entropy.
+"""
 function Random.seed!(rng::AbstractPythonRNG, seed::Integer)
     rng.pyobj = rng.factory(seed)
     rng.random = rng.pyobj.random
