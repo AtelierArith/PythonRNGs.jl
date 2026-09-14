@@ -112,3 +112,13 @@ end
 @testset "Random method compatibility" begin
     @test isempty(Test.detect_ambiguities(PythonRNGs, Random))
 end
+
+@testset "Complex array dispatch and C order" for R in (PythonRandom, NumPyRandomDefaultRNG, NumPyRandom), dims in ((), (2, 3), (2, 3, 4))
+    rng, ref = R(42), R(42)
+    A = Array{ComplexF64}(undef, dims)
+    @test rand!(rng, A) === A
+    expected = [rand(ref, ComplexF64) for _ in 1:prod(dims)]
+    @test vec(permutedims(A, reverse(ntuple(identity, length(dims))))) == expected
+    @test rand(rng) == rand(ref)
+    @test A == rand(R(42), ComplexF64, dims)
+end
