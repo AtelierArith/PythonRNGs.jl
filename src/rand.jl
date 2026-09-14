@@ -36,6 +36,16 @@ Random.rand!(rng::AbstractPythonRNG, A::AbstractArray, sp::Random.Sampler) =
 Random.rand!(rng::AbstractPythonRNG, A::BitArray, sp::Random.SamplerType{Bool}) =
     _rand_c_order!(rng, A, sp)
 
+# Julia 1.14 adds specialized complex Array methods, including a 0D method.
+# Resolve their intersections explicitly and retain C-order scalar sampling.
+const _ComplexComponent = Union{Float16,Float32,Float64,Int8,Int16,Int32,Int64,UInt8,UInt16,UInt32,UInt64}
+Random.rand!(
+    rng::AbstractPythonRNG, A::Array{Complex{T}}, sp::Random.SamplerType{Complex{T}},
+) where {T<:_ComplexComponent} = _rand_c_order!(rng, A, sp)
+Random.rand!(
+    rng::AbstractPythonRNG, A::Array{Complex{T},0}, sp::Random.SamplerType{Complex{T}},
+) where {T<:_ComplexComponent} = _rand_c_order!(rng, A, sp)
+
 function _rand_c_order!(rng::AbstractPythonRNG, A::AbstractArray, sp::Random.Sampler)
     for I in CartesianIndices(reverse(axes(A)))
         @inbounds A[reverse(Tuple(I))...] = rand(rng, sp)

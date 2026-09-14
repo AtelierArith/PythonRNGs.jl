@@ -1,7 +1,7 @@
 """
     AbstractPythonRNG <: Random.AbstractRNG
 
-Supertype of random number generators that delegate uniform sampling to a
+Supertype of random number generators that delegate sampling to a
 Python object through [PythonCall.jl](https://github.com/JuliaPy/PythonCall.jl).
 
 Concrete subtypes:
@@ -52,7 +52,7 @@ end
 """
     PythonRandom([seed])
 
-Create an `AbstractRNG` that draws uniform random numbers from Python's
+Create an `AbstractRNG` that draws random numbers from Python's
 standard [`random.Random`](https://docs.python.org/3/library/random.html).
 
 `rand(rng, Float64)` returns exactly the value that `random.Random(seed).random()`
@@ -68,7 +68,7 @@ end
 """
     NumPyRandomDefaultRNG([seed])
 
-Create an `AbstractRNG` that draws uniform random numbers from NumPy's
+Create an `AbstractRNG` that draws random numbers from NumPy's
 [`numpy.random.default_rng`](https://numpy.org/doc/stable/reference/random/generator.html).
 
 `rand(rng, Float64)` returns exactly the value that `default_rng(seed).random()`
@@ -85,7 +85,7 @@ end
 """
     NumPyRandom([seed])
 
-Create an `AbstractRNG` that draws uniform random numbers from NumPy's legacy
+Create an `AbstractRNG` that draws random numbers from NumPy's legacy
 [`numpy.random.RandomState`](https://numpy.org/doc/stable/reference/random/legacy.html),
 i.e. the generator behind `np.random.seed(...)` and `np.random.random(...)`.
 
