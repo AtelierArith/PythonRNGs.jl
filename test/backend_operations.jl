@@ -118,7 +118,9 @@ end
     A = Array{ComplexF64}(undef, dims)
     @test rand!(rng, A) === A
     expected = [rand(ref, ComplexF64) for _ in 1:prod(dims)]
-    @test vec(permutedims(A, reverse(ntuple(identity, length(dims))))) == expected
+    # Julia 1.10 cannot permutedims a zero-dimensional array.
+    flat = isempty(dims) ? [A[]] : vec(permutedims(A, reverse(ntuple(identity, length(dims)))))
+    @test flat == expected
     @test rand(rng) == rand(ref)
     @test A == rand(R(42), ComplexF64, dims)
 end
