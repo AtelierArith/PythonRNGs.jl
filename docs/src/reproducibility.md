@@ -31,13 +31,55 @@ For the same seed, each draw equals the corresponding Python call:
 - `NumPyRandomDefaultRNG` and `NumPyRandom` throw `NotSupportedError` for integer
   ranges whose element type NumPy has no dtype for (`Int128`, `UInt128`,
   `BigInt`); `PythonRandom` supports those.
-- Multidimensional arrays are filled in column-major (Fortran) order:
+- Both `rand(rng, ..., dims...)` and `rand!(rng, A, ...)` fill in C order
+  (last index varies fastest), matching Python's logical indices. For the same seed
+  and preceding calls, `jlarray[begin+i, begin+j] == nparray[i, j]`.
+  Julia arrays still use column-major storage; only the draw assignment changes.
   - `rand(rng::NumPyRandomDefaultRNG, dims...)` equals
-    `default_rng(seed).random(prod(dims)).reshape(dims, order="F")`.
+    `default_rng(seed).random(size=dims)` elementwise.
   - `rand(rng::NumPyRandom, dims...)` equals
-    `RandomState(seed).random_sample(prod(dims)).reshape(dims, order="F")`.
-  - `rand(rng::PythonRandom, dims...)` equals
-    `numpy.array([random.Random(seed).random() for _ in range(prod(dims))]).reshape(dims, order="F")`.
+    `RandomState(seed).random_sample(size=dims)` elementwise.
+  - `PythonRandom` draws repeatedly from a single `random.Random(seed)` instance
+    and fills in C order, equivalent to reshaping the resulting list with
+    `numpy.array(values).reshape(dims)`.
+  - NumPy `Float64` arrays and `NumPyRandomDefaultRNG` `Float32` arrays are
+    generated in one backend call. Other types and collections use repeated
+    scalar draws in C order; these need not match NumPy's bulk integer APIs,
+    which can consume the random stream differently.
+  - This changes the previous column-major assignment for multidimensional
+    draws, including `rand!`. For an existing array or view, `rand!(rng, A)`
+    assigns the same values as `rand(rng, eltype(A), size(A))` from the same
+    RNG state, and returns `A` itself.
 - Only uniform distributions are provided. Distributions such as `Normal` or
   `Exponential` are intentionally out of scope; draw a uniform value and
   transform it yourself if needed.
+
+## Array order
+
+Both allocating and in-place draws assign values in C order: the last index
+varies fastest. For a 2×3 array, six successive values `a, b, c, d, e, f`
+occupy these positions:
+
+```text
+a b c
+d e f
+```
+
+```julia
+using PythonRNGs, PythonCall, Random
+
+A = rand(NumPyRandomDefaultRNG(42), 2, 3)
+B = zeros(2, 3)
+@assert rand!(NumPyRandomDefaultRNG(42), B) === B
+@assert A == B
+
+np = pyimport("numpy")
+nparray = np.random.default_rng(42).random(size = (2, 3))
+for i in 0:1, j in 0:2
+    @assert B[begin+i, begin+j] == pyconvert(Float64, nparray[i, j])
+end
+```
+
+`A` and `B` are Julia `Matrix{Float64}` values, not `Py` wrappers. The same
+index correspondence applies in higher dimensions. Type and range arguments,
+as well as destinations that are views, also use C-order assignment.
