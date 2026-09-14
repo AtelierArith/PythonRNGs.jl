@@ -242,38 +242,119 @@ using PythonCall
         @test_throws NotSupportedError rand(NumPyRandomDefaultRNG(1), UInt128(1):UInt128(6))
     end
 
-    @testset "multidimensional arrays ($seed)" for seed in (0, 2024)
-        # PythonRandom: wrap the flat list in a NumPy array and reshape it in
-        # Fortran order (NumPy has no generator for the stdlib `random`).
-        rng = PythonRandom(seed)
-        x = rand(rng, 2, 3)
-        ref = pyimport("random").Random(seed)
-        flat = [pyconvert(Float64, ref.random()) for _ = 1:6]
-        @test vec(x) == flat
-        mF = pyimport("numpy").reshape(pyimport("numpy").array(flat), (2, 3), order = "F")
-        @test x == [pyconvert(Float64, mF[i, k]) for i = 0:1, k = 0:2]
+    @testset "C-order arrays ($seed)" for seed in (0, 2024)
+        np = pyimport("numpy")
+        for R in (PythonRandom, NumPyRandomDefaultRNG, NumPyRandom),
+            dims in ((), (0,), (5,), (2, 3), (2, 3, 4), (2, 0, 3), (1, 3, 1))
+            rng = R(seed)
+            ref = rng.factory(seed)
+            expected = if R === PythonRandom
+                flat = [pyconvert(Float64, ref.random()) for _ = 1:prod(dims)]
+                np.array(flat).reshape(dims)
+            else
+                ref.random(size = dims)
+            end
+            actual = rand(rng, Float64, dims)
+            @test actual isa Array{Float64,length(dims)}
+            @test size(actual) == dims
+            @test actual == pyconvert(Array, expected)
+            # Check the Python zero-based index correspondence directly.
+            for I in CartesianIndices(actual)
+                @test actual[I] == pyconvert(Float64, expected[(Tuple(I) .- 1)...])
+            end
+            @test rand(rng) == pyconvert(Float64, ref.random())
+            if !isempty(dims)
+                @test rand(R(seed), dims...) == actual
+                @test rand(R(seed), Float64, dims...) == actual
+            end
+        end
 
-        # NumPyRandomDefaultRNG: Julia fills column-major, i.e. NumPy's Fortran order.
-        rng = NumPyRandomDefaultRNG(seed)
-        y = rand(rng, 2, 3)
-        ref = pyimport("numpy").random.default_rng(seed)
-        mF = pyimport("numpy").reshape(ref.random(6), (2, 3), order = "F")
-        @test y == [pyconvert(Float64, mF[i, k]) for i = 0:1, k = 0:2]
+        # Native Float32 bulk draws, including an odd count followed by Float64.
+        for dims in ((), (5,), (3, 5), (2, 3, 4), (2, 0, 3))
+            rng = NumPyRandomDefaultRNG(seed)
+            ref = np.random.default_rng(seed)
+            expected = ref.random(size = dims, dtype = "float32")
+            actual = rand(rng, Float32, dims)
+            @test actual isa Array{Float32,length(dims)}
+            @test actual == pyconvert(Array, expected)
+            @test rand(rng) == pyconvert(Float64, ref.random())
+        end
 
-        # NumPyRandom: same Fortran-order layout.
-        rng = NumPyRandom(seed)
-        z = rand(rng, 2, 3)
-        ref = pyimport("numpy").random.RandomState(seed)
-        mF = pyimport("numpy").reshape(ref.random_sample(6), (2, 3), order = "F")
-        @test z == [pyconvert(Float64, mF[i, k]) for i = 0:1, k = 0:2]
+        # Other types and collections retain scalar draw semantics, in C order.
+        for R in (PythonRandom, NumPyRandomDefaultRNG, NumPyRandom),
+            X in (Float16, Float32, Int64, UInt8, Bool, 1:6, 'a':'z', 1.0:0.5:2.0)
+            rng = R(seed)
+            ref = R(seed)
+            expected = [rand(ref, X) for _ = 1:24]
+            actual = rand(rng, X, 2, 3, 4)
+            @test [actual[i, j, k] for i = 1:2 for j = 1:3 for k = 1:4] == expected
+            @test rand(rng) == rand(ref)
+        end
 
-        for r in (PythonRandom(seed), NumPyRandomDefaultRNG(seed), NumPyRandom(seed))
-            x = rand(r, 2, 3)
-            @test x isa Matrix{Float64}
-            @test size(x) == (2, 3)
-            @test size(rand(r, Float32, 2, 3)) == (2, 3)
-            @test size(rand(r, 1:6, 2, 3)) == (2, 3)
-            @test size(rand(r, 'a':'z', 2, 3)) == (2, 3)
+        for R in (PythonRandom, NumPyRandomDefaultRNG, NumPyRandom)
+            rng = R(seed)
+            for T in (Float64, Float32, Int64)
+                @test_throws ArgumentError rand(rng, T, 2, -1)
+            end
+            @test rand(rng) == rand(R(seed))
+
+        end
+    end
+
+    @testset "C-order in-place arrays ($seed)" for seed in (0, 2024)
+        np = pyimport("numpy")
+        for R in (PythonRandom, NumPyRandomDefaultRNG, NumPyRandom),
+            T in (Float64, Float32),
+            dims in ((), (0,), (5,), (2, 3), (2, 3, 4), (2, 0, 3))
+            rng = R(seed)
+            ref = rng.factory(seed)
+            expected = if T === Float64 && R !== PythonRandom
+                ref.random(size = dims)
+            elseif T === Float32 && R === NumPyRandomDefaultRNG
+                ref.random(size = dims, dtype = "float32")
+            else
+                nothing
+            end
+            actual = Array{T}(undef, dims)
+            @test rand!(rng, actual) === actual
+            if expected !== nothing
+                @test actual == pyconvert(Array, expected)
+                @test rand(rng) == pyconvert(Float64, ref.random())
+            else
+                reference_rng = R(seed)
+                @test actual == rand(reference_rng, T, dims)
+                @test rand(rng) == rand(reference_rng)
+            end
+        end
+
+        for R in (PythonRandom, NumPyRandomDefaultRNG, NumPyRandom)
+            # Noncontiguous views must write only the destination elements.
+            parent = fill(-1.0, 4, 6)
+            dest = @view parent[1:2:4, 2:2:6]
+            rng, ref = R(seed), R(seed)
+            @test rand!(rng, dest) === dest
+            @test dest == rand(ref, 2, 3)
+            @test rand(rng) == rand(ref)
+            @test all(==(-1), parent[2:2:4, :])
+            @test all(==(-1), parent[:, 1:2:5])
+
+            # Explicit type, range, and sampler entry points share C order.
+            for X in (Float64, Float32, UInt8, Bool, 1:6, 'a':'z')
+                rng, ref = R(seed), R(seed)
+                A = Array{Random.gentype(X)}(undef, 2, 3)
+                @test rand!(rng, A, X) === A
+                @test A == rand(ref, X, 2, 3)
+                @test rand(rng) == rand(ref)
+                rng, ref = R(seed), R(seed)
+                @test rand!(rng, A, Random.Sampler(rng, X)) === A
+                @test A == rand(ref, X, 2, 3)
+                @test rand(rng) == rand(ref)
+            end
+            rng, ref = R(seed), R(seed)
+            bits = falses(2, 3)
+            @test rand!(rng, bits) === bits
+            @test bits == rand(ref, Bool, 2, 3)
+            @test rand(rng) == rand(ref)
         end
     end
 

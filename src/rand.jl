@@ -18,6 +18,60 @@ Random.rng_native_52(::AbstractPythonRNG) = UInt64
 
 @inline _rand_float64(rng::AbstractPythonRNG) = pyconvert(Float64, rng.random())
 
+# Array draws follow Python's C order (last index varies fastest), including
+# writes into existing arrays and views.
+Random.rand(rng::AbstractPythonRNG, ::Type{T}, dims::Dims) where {T} =
+    _rand_array(rng, T, dims)
+Random.rand(rng::AbstractPythonRNG, X, dims::Dims) = _rand_array(rng, X, dims)
+
+function _rand_array(rng::AbstractPythonRNG, X, dims::Dims)
+    A = Array{Random.gentype(X)}(undef, dims)
+    return rand!(rng, A, Random.Sampler(rng, X))
+end
+
+Random.rand!(rng::AbstractPythonRNG, A::AbstractArray, sp::Random.Sampler) =
+    _rand_c_order!(rng, A, sp)
+
+# Resolve Random's specialized BitArray method while using the same draw order.
+Random.rand!(rng::AbstractPythonRNG, A::BitArray, sp::Random.SamplerType{Bool}) =
+    _rand_c_order!(rng, A, sp)
+
+function _rand_c_order!(rng::AbstractPythonRNG, A::AbstractArray, sp::Random.Sampler)
+    for I in CartesianIndices(reverse(axes(A)))
+        @inbounds A[reverse(Tuple(I))...] = rand(rng, sp)
+    end
+    return A
+end
+
+function Random.rand!(
+    rng::Union{NumPyRandomDefaultRNG,NumPyRandom}, A::AbstractArray,
+    ::Random.SamplerType{Float64},
+)
+    return copyto!(A, _rand_array(rng, Float64, size(A)))
+end
+
+function Random.rand!(
+    rng::NumPyRandomDefaultRNG, A::AbstractArray, ::Random.SamplerType{Float32},
+)
+    return copyto!(A, _rand_array(rng, Float32, size(A)))
+end
+
+# Converting a NumPy array preserves logical indices, regardless of the
+# different memory layouts. Native array calls also avoid per-element calls.
+function _rand_array(
+    rng::Union{NumPyRandomDefaultRNG,NumPyRandom}, ::Type{Float64}, dims::Dims,
+)
+    all(d -> d >= 0, dims) || throw(ArgumentError("array dimensions must be non-negative"))
+    return pyconvert(Array{Float64,length(dims)}, rng.random(size = dims))
+end
+
+function _rand_array(rng::NumPyRandomDefaultRNG, ::Type{Float32}, dims::Dims)
+    all(d -> d >= 0, dims) || throw(ArgumentError("array dimensions must be non-negative"))
+    return pyconvert(
+        Array{Float32,length(dims)}, rng.pyobj.random(size = dims, dtype = "float32"),
+    )
+end
+
 # Native uniform integers.
 #
 # Python's `random.Random` exposes `getrandbits(k)`; NumPy's `Generator`
