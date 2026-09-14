@@ -50,9 +50,6 @@ For the same seed, each draw equals the corresponding Python call:
     draws, including `rand!`. For an existing array or view, `rand!(rng, A)`
     assigns the same values as `rand(rng, eltype(A), size(A))` from the same
     RNG state, and returns `A` itself.
-- Only uniform distributions are provided. Distributions such as `Normal` or
-  `Exponential` are intentionally out of scope; draw a uniform value and
-  transform it yourself if needed.
 
 ## Array order
 
@@ -83,3 +80,42 @@ end
 `A` and `B` are Julia `Matrix{Float64}` values, not `Py` wrappers. The same
 index correspondence applies in higher dimensions. Type and range arguments,
 as well as destinations that are views, also use C-order assignment.
+
+## Normal draws, permutations, and shuffles
+
+The following operations delegate to the corresponding method on the same
+backend instance, so interleaving them with uniform draws stays synchronized:
+
+| Julia | `PythonRandom` | `NumPyRandomDefaultRNG` | `NumPyRandom` |
+| --- | --- | --- | --- |
+| `randn(rng)` | `gauss(0, 1)` | `standard_normal()` | `standard_normal()` |
+| `randn(rng, dims...)` | repeated `gauss(0, 1)` in C order | `standard_normal(size=dims)` | `standard_normal(size=dims)` |
+| `randn!(rng, A)` | repeated `gauss(0, 1)` in C order | `standard_normal(size=A.shape)` copied into `A` | `standard_normal(size=A.shape)` copied into `A` |
+| `randperm(rng, n)` | `sample(range(n), n)`, plus 1 | `permutation(n)`, plus 1 | `permutation(n)`, plus 1 |
+| `shuffle(rng, v)`, `shuffle!(rng, v)` | `shuffle` | `shuffle` | `shuffle` |
+
+Normal arrays are Julia arrays with the same logical indices as the Python
+result. `randn!` returns the destination, supports views, and uses the same
+C-order assignment as `randn`. Both scalar and array calls retain any cached
+normal on the backend; `copy`/`deepcopy` preserve it and `seed!` clears it.
+`NumPyRandomDefaultRNG` uses native `standard_normal(dtype="float32")` for
+`Float32`. Other `Float32` normals and all `Float16` normals convert the
+backend's `Float64` normal draws. Complex normals retain Julia's construction
+from real normal draws; they have no direct Python counterpart.
+
+Permutation values are shifted by one because Julia indexes from 1.
+`randperm(rng, n)` preserves the integer type of `n`. For the legacy NumPy
+backend, `randperm(rng, n)[1:k]` matches
+`RandomState.choice(n, k, replace=False) + 1`, including subsequent RNG state.
+This equivalence is specific to `RandomState`, not `Generator.choice`.
+
+Backend shuffle delegation applies to vectors (including ranges passed to
+`shuffle`, Boolean vectors, and views). `shuffle` returns a new vector;
+`shuffle!` returns and updates its argument. Python shuffles a temporary
+index sequence and Julia moves the original values, preserving object identity.
+For `PythonRandom`, `randperm` deliberately uses `sample`, whereas `shuffle`
+uses `shuffle`: these are distinct Python operations and may give different
+permutations for the same seed.
+
+Other distributions, such as exponential, gamma, and multivariate normal,
+do not have dedicated backend delegation.

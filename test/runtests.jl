@@ -369,3 +369,5 @@ using PythonCall
         @test rand(rng, 5) == rand(d, 5)
     end
 end
+
+include("backend_operations.jl")

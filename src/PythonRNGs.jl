@@ -8,5 +8,7 @@ export AbstractPythonRNG,
 
 include("backends.jl")
 include("rand.jl")
+include("normal.jl")
+include("permutations.jl")
 
 end # module PythonRNGs
