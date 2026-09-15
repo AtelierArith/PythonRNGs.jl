@@ -1,6 +1,7 @@
 # PythonRNGs.jl
 
 [![CI](https://github.com/AtelierArith/PythonRNGs.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/AtelierArith/PythonRNGs.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/AtelierArith/PythonRNGs.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/AtelierArith/PythonRNGs.jl)
 [![Documentation](https://github.com/AtelierArith/PythonRNGs.jl/actions/workflows/Documenter.yml/badge.svg)](https://github.com/AtelierArith/PythonRNGs.jl/actions/workflows/Documenter.yml)
 [![docs](https://img.shields.io/badge/docs-dev-blue)](https://atelierarith.github.io/PythonRNGs.jl/dev/)
 
