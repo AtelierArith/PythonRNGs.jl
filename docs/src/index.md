@@ -31,11 +31,11 @@ Three backends are provided:
 
 ## Installation
 
-The package is not registered yet, so install it from a local checkout:
+Install the registered package from the General registry:
 
 ```julia
 using Pkg
-Pkg.develop(path = "path/to/PythonRNGs.jl")
+Pkg.add("PythonRNGs")
 ```
 
 Requirements:
