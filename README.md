@@ -30,7 +30,7 @@ Three backends are provided:
 
 ```julia
 using Pkg
-Pkg.develop(path = "path/to/PythonRNGs.jl")
+Pkg.add("PythonRNGs")
 ```
 
 Requires Julia 1.10+. The NumPy backends need a Python interpreter with NumPy,
