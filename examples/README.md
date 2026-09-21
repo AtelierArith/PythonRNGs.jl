@@ -11,11 +11,13 @@ slower than a native Julia RNG. They show how to **validate a Julia port of
 Python code** by checking that the translated routine matches the original
 Python implementation value-for-value.
 
+Each example draws a 2×3 matrix.
+
 | Example | Python (`main.py`) | Julia (`main.jl`) | Seed |
 | --- | --- | --- | --- |
-| `example1` | `random.seed` + `random.random()` | `PythonRandom` | 1234 |
-| `example2` | `np.random.seed` + `np.random.random()` (legacy) | `NumPyRandom` | 999 |
-| `example3` | `np.random.default_rng` | `NumPyRandomDefaultRNG` | 42 |
+| `example1` | `random.Random(seed)` + `rng.random()` | `PythonRandom` | 1234 |
+| `example2` | `np.random.RandomState(seed)` + `rng.random((2, 3))` (legacy) | `NumPyRandom` | 999 |
+| `example3` | `np.random.default_rng(seed)` + `rng.random((2, 3))` | `NumPyRandomDefaultRNG` | 42 |
 
 ## Expected output
 
@@ -23,21 +25,32 @@ Julia:
 
 ```console
 $ julia --project=.. main.jl
-example1(rng) = 2.9329070713842773
-example2(rng) = 2.6068560801593756
-example3(rng) = 2.5479120971119267
+example1(1234) =
+[0.9664535356921388, 0.4407325991753527, 0.007491470058587191]
+[0.9109759624491242, 0.939268997363764, 0.5822275730589491]
+example2(999) =
+[0.8034280400796879, 0.5275222956826447, 0.11911146502821202]
+[0.6396814442423551, 0.09092526277407997, 0.3322256807930123]
+example3(rng) =
+[0.7739560485559633, 0.4388784397520523, 0.8585979199113825]
+[0.6973680290593639, 0.09417734788764953, 0.9756223516367559]
 ```
 
 Python:
 
 ```console
 $ uv run main.py
-example1()=2.9329070713842773
-example2()=2.6068560801593756
-example3(rng)=2.5479120971119267
+example1(1234) =
+[[0.9664535356921388, 0.4407325991753527, 0.007491470058587191], [0.9109759624491242, 0.939268997363764, 0.5822275730589491]]
+example2(999) =
+[[0.8034280400796879  0.5275222956826447  0.11911146502821202]
+ [0.6396814442423551  0.09092526277407997 0.3322256807930123 ]]
+example3(rng) =
+[[0.7739560485559633  0.4388784397520523  0.8585979199113825 ]
+ [0.6973680290593639  0.09417734788764953 0.9756223516367559 ]]
 ```
 
-The values and the draw order match for every example.
+The values and the draw order (row-major) match for every example.
 
 ## Running
 
@@ -101,15 +114,23 @@ with `main.py` regardless of which NumPy API is being used.
 using PythonRNGs
 using Random: Random
 
-example1(seed) = 2rand(PythonRandom(seed)) + 1
-example2(seed) = 2rand(NumPyRandom(seed)) + 1
-example3(rng::Random.AbstractRNG) = 2rand(rng) + 1
+example1(seed) = rand(PythonRandom(seed), 2, 3)
+example2(seed) = rand(NumPyRandom(seed), 2, 3)
+example3(rng::Random.AbstractRNG) = rand(rng, 2, 3)
 
-@show example1(1234)
-@show example2(999)
+show_matrix(A) = for i in axes(A, 1)
+    println("[", join((A[i, j] for j in axes(A, 2)), ", "), "]")
+end
+
+println("example1(1234) =")
+show_matrix(example1(1234))
+
+println("example2(999) =")
+show_matrix(example2(999))
 
 rng = NumPyRandomDefaultRNG(42)
-@show example3(rng)
+println("example3(rng) =")
+show_matrix(example3(rng))
 ```
 
 `main.py`:
@@ -118,23 +139,30 @@ rng = NumPyRandomDefaultRNG(42)
 import random
 import numpy as np
 
+np.set_printoptions(precision=17)
+
 def example1(seed):
-    random.seed(seed)
-    return 2 * random.random() + 1
+	rng = random.Random(seed)
+	return [[rng.random() for _ in range(3)] for _ in range(2)]
 
 def example2(seed):
-    np.random.seed(seed)
-    return 2 * np.random.random() + 1
+	rng = np.random.RandomState(seed)
+	return rng.random((2, 3))
 
 def example3(rng):
-    return 2 * rng.random() + 1
+	return rng.random((2, 3))
 
 def main():
-    print(f"{example1(1234)=}")
-    print(f"{example2(999)=}")
-    rng = np.random.default_rng(42)
-    print(f"{example3(rng)=}")
+	print("example1(1234) =")
+	print(example1(1234))
+
+	print("example2(999) =")
+	print(example2(999))
+
+	rng = np.random.default_rng(42)
+	print("example3(rng) =")
+	print(example3(rng))
 
 if __name__ == "__main__":
-    main()
+	main()
 ```
