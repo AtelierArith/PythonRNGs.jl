@@ -1,5 +1,6 @@
 .CondaPkg/
 .codegraph/
+.opencode/
 docs/build/
 docs/site/
 Manifest.toml
